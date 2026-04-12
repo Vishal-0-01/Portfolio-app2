@@ -1,5 +1,5 @@
 """
-app.py — Flask API Server (FIXED FOR PRODUCTION)
+app.py — Flask API Server (FINAL FIXED)
 """
 
 import os
@@ -23,7 +23,6 @@ from optimizer import (
     run_performance_backtest,
     run_walk_forward_backtest,
     build_cov_from_returns,
-    get_optimizer_state,
     VOL_CAP, RF,
     NIFTY_MEAN_PE, NIFTY_STD_PE,
     NIFTY_MEAN_PB, NIFTY_STD_PB,
@@ -58,7 +57,8 @@ def _init_state():
         _RETURNS_DF = returns_df
         funds = list(returns_df.columns)
 
-        ann_returns, cov_mat, vols, fund_sharpes = build_cov_from_returns(returns_df)
+        # 🔥 FIX: correct unpacking (5 values, not 4)
+        ann_returns, cov_mat, vols, fund_sharpes, extra_stats = build_cov_from_returns(returns_df)
 
         state = {
             "funds": funds,
@@ -66,6 +66,7 @@ def _init_state():
             "cov_mat": cov_mat,
             "vols": vols,
             "fund_sharpes": fund_sharpes,
+            "extra_stats": extra_stats,   # 🔥 REQUIRED
             "source": source,
         }
 
@@ -112,13 +113,13 @@ def _init_state():
         logger.error("🔥 INIT FAILED")
         traceback.print_exc()
 
-        # fallback (prevents total crash)
         _STATE = {
             "funds": [],
             "ann_returns": [],
             "cov_mat": [],
             "vols": [],
             "fund_sharpes": [],
+            "extra_stats": {},   # 🔥 prevent crashes
             "source": "failed",
             "frontier": [],
             "backtest": [],
@@ -127,7 +128,7 @@ def _init_state():
         }
 
 
-# 🔴 CRITICAL FIX: RUN INIT ON IMPORT (FOR GUNICORN)
+# 🔴 CRITICAL: runs for gunicorn
 _init_state()
 
 
@@ -141,9 +142,7 @@ def _err(msg, code=400):
 
 
 def _require_state():
-    if not _STATE or not _STATE.get("funds"):
-        return False
-    return True
+    return bool(_STATE.get("funds"))
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -232,7 +231,6 @@ def static_files(path):
     return send_from_directory(FRONTEND_DIR, path)
 
 
-# ── Local run ─────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
