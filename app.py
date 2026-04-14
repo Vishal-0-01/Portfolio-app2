@@ -1,11 +1,12 @@
 """
-app.py — Flask API Server (FINAL FIXED)
+app.py — Flask API Server (FINAL + CACHING ENABLED)
 """
 
 import os
 import sys
 import logging
 import time
+import pickle
 
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
@@ -14,6 +15,8 @@ from flask_cors import CORS
 BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
 BACKEND_DIR  = os.path.join(BASE_DIR, "backend")
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
+CACHE_FILE   = os.path.join(BASE_DIR, "state_cache.pkl")
+
 sys.path.insert(0, BACKEND_DIR)
 
 from optimizer import (
@@ -45,6 +48,22 @@ _RETURNS_DF = None
 def _init_state():
     global _STATE, _RETURNS_DF
 
+    # ✅ STEP 1: Try loading cache
+    if os.path.exists(CACHE_FILE):
+        try:
+            logger.info("⚡ Loading state from cache...")
+            with open(CACHE_FILE, "rb") as f:
+                _STATE = pickle.load(f)
+
+            _RETURNS_DF = _STATE.get("returns_df", None)
+
+            if _STATE.get("funds"):
+                logger.info("✅ Cache loaded successfully")
+                return
+        except Exception as e:
+            logger.warning("Cache load failed, rebuilding... %s", e)
+
+    # ✅ STEP 2: Build fresh state
     try:
         logger.info("🚀 Initialising optimizer state...")
         t0 = time.time()
@@ -57,7 +76,6 @@ def _init_state():
         _RETURNS_DF = returns_df
         funds = list(returns_df.columns)
 
-        # 🔥 FIX: correct unpacking (5 values, not 4)
         ann_returns, cov_mat, vols, fund_sharpes, extra_stats = build_cov_from_returns(returns_df)
 
         state = {
@@ -66,8 +84,9 @@ def _init_state():
             "cov_mat": cov_mat,
             "vols": vols,
             "fund_sharpes": fund_sharpes,
-            "extra_stats": extra_stats,   # 🔥 REQUIRED
+            "extra_stats": extra_stats,
             "source": source,
+            "returns_df": returns_df,
         }
 
         # Safe computations
@@ -108,6 +127,14 @@ def _init_state():
             source,
         )
 
+        # ✅ STEP 3: Save cache
+        try:
+            with open(CACHE_FILE, "wb") as f:
+                pickle.dump(_STATE, f)
+            logger.info("💾 Cache saved successfully")
+        except Exception as e:
+            logger.warning("Cache save failed: %s", e)
+
     except Exception as e:
         import traceback
         logger.error("🔥 INIT FAILED")
@@ -119,7 +146,7 @@ def _init_state():
             "cov_mat": [],
             "vols": [],
             "fund_sharpes": [],
-            "extra_stats": {},   # 🔥 prevent crashes
+            "extra_stats": {},
             "source": "failed",
             "frontier": [],
             "backtest": [],
