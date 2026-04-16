@@ -221,6 +221,27 @@ def api_optimize():
 
         result["fund_names"] = _STATE["funds"]
 
+        # ── Buy/Sell signal computation ───────────────────────────────────
+        target_weights  = result["fund_weights"]
+        N               = len(target_weights)
+        current_weights = [1.0 / N] * N
+
+        delta_weights = [
+            float(target_weights[i]) - float(current_weights[i])
+            for i in range(N)
+        ]
+
+        turnover = sum(abs(dw) for dw in delta_weights)
+        cost_estimate = turnover * 0.002
+
+        rebalance_action = "SKIP" if turnover < 0.05 else "REBALANCE"
+
+        result["delta_weights"]    = delta_weights
+        result["turnover"]         = float(turnover)
+        result["cost_estimate"]    = float(cost_estimate)
+        result["rebalance_action"] = rebalance_action
+        # ─────────────────────────────────────────────────────────────────
+
         return _ok(result)
 
     except Exception as e:
