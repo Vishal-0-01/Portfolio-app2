@@ -393,7 +393,6 @@ input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
     <span class="z-chip" id="zc-c">z_combined: 0.00</span>
     <span class="z-chip" id="zc-eq">Equity target: 70%</span>
   </div>
-  <div id="rebalance-status" style="font-family:var(--mono);font-size:.7rem;margin-left:10px;"></div>
 </div>
 
 <!-- METRICS -->
@@ -404,8 +403,6 @@ input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
   <div class="m-card"><div class="m-lbl">Equity Alloc</div><div class="m-val" id="m-eq">—</div><div class="m-sub">valuation-adjusted</div></div>
   <div class="m-card"><div class="m-lbl">Defensive</div><div class="m-val" id="m-def">—</div><div class="m-sub">debt + gold + cash</div></div>
   <div class="m-card"><div class="m-lbl">Equity Sleeve Vol</div><div class="m-val" id="m-eqv">—</div><div class="m-sub">within equity portion</div></div>
-  <div class="m-card"><div class="m-lbl">Turnover</div><div class="m-val" id="m-turnover">—</div><div class="m-sub">from equal weight</div></div>
-  <div class="m-card"><div class="m-lbl">Est. Cost</div><div class="m-val" id="m-cost">—</div><div class="m-sub">20bps × turnover</div></div>
 </div>
 
 <!-- MAIN 2-COL -->
@@ -619,29 +616,15 @@ function renderResult(d){
   document.getElementById('m-eqv').textContent=fmt(d.eq_vol);
   if(!volOk)showToast(`⚠ Vol ${fmt(d.port_vol)} slightly above cap`);
 
-  // Turnover, cost, rebalance action
-  if(d.turnover!=null){
-    document.getElementById('m-turnover').textContent=(d.turnover*100).toFixed(2)+'%';
-    document.getElementById('m-cost').textContent=(d.cost_estimate*100).toFixed(3)+'%';
-    const rsEl=document.getElementById('rebalance-status');
-    const isRebal=d.rebalance_action==='REBALANCE';
-    rsEl.textContent=isRebal?'⬆ REBALANCE':'✓ SKIP';
-    rsEl.style.color=isRebal?'var(--yellow)':'var(--green)';
-    rsEl.style.fontWeight='600';
-  }
-
   const funds=d.fund_names||_funds;
   const fw=d.fund_weights;
   const si=funds.map((_,i)=>i).sort((a,b)=>fw[b]-fw[a]);
 
-  // Equity bars — with buy/sell signal
+  // Equity bars
   document.getElementById('fund-alloc').innerHTML=si.map(i=>{
     const pw=fw[i]*d.equity;
-    const delta=d.delta_weights?d.delta_weights[i]:null;
-    const signal=delta==null?'':delta>0.001?'▲':delta<-0.001?'▼':'';
-    const signalColor=signal==='▲'?'var(--green)':signal==='▼'?'var(--red)':'';
     return `<div class="alloc-row">
-      <div class="a-name" title="${funds[i]}"><span style="color:${signalColor};font-size:.65rem;margin-right:3px">${signal}</span>${funds[i]}</div>
+      <div class="a-name" title="${funds[i]}">${funds[i]}</div>
       <div class="a-bar-wrap"><div class="a-bar" style="width:${Math.min(100,pw/0.15*100)}%;background:${EQ_COLORS[i%EQ_COLORS.length]}"></div></div>
       <div class="a-pct">${(pw*100).toFixed(2)}%</div>
       <div class="a-sh">Sh ${d.fund_sharpes[i].toFixed(2)}</div>
